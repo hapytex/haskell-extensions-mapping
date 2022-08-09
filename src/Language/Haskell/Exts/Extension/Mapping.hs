@@ -22,39 +22,39 @@ import qualified Language.Haskell.TH.LanguageExtensions as T
 import Language.Haskell.TH.LanguageExtensions(Extension)
 import Language.Haskell.Exts.Extension(KnownExtension(..))
 
-data ExtensionMapping a b
+data ExtensionMapping a
   = NoMapping
-  | ImpliedBy a [b]
-  | Matches b
+  | ImpliedBy [a]
+  | Matches a
   | ByDefaultEnabled
   deriving (Eq, Foldable, Functor, Ord, Read, Show)
 
-instance Bounded (ExtensionMapping a b) where
+instance Bounded (ExtensionMapping a) where
   minBound = NoMapping
   maxBound = ByDefaultEnabled
 
-mapItem :: c -> (a -> [b] -> c) -> (b -> c) -> c -> ExtensionMapping a b -> c
+mapItem :: b -> ([a] -> b) -> (a -> b) -> b -> ExtensionMapping a -> b
 mapItem a f g b = go
   where go NoMapping = a
-        go (ImpliedBy x xs) = f x xs
+        go (ImpliedBy xs) = f xs
         go (Matches x) = g x
         go ByDefaultEnabled = b
 
-_dispatch :: (a -> ExtensionMapping a b) -> [a] -> ([a], [(a, [b])], [b], [a])
+_dispatch :: (a -> ExtensionMapping b) -> [a] -> ([a], [(a, [b])], [b], [a])
 _dispatch mp = foldr (f <*> mp) ([], [], [], [])
   where f x0 m ~(as, ys, xs, bs) = go m
           where go NoMapping = (x0 : as, ys, xs, bs)
-                go (ImpliedBy yo yi) = (as, (yo, yi) : ys, xs, bs)
+                go (ImpliedBy y) = (as, (x0, y) : ys, xs, bs)
                 go (Matches x) = (as, ys, x : xs, bs)
                 go ByDefaultEnabled = (as, ys, xs, x0:bs)
 
-_dispatch' :: (a -> ExtensionMapping a b) -> [a] -> [b]
-_dispatch' m = mapMaybe (mapItem Nothing (const (const Nothing)) Just Nothing . m)
+_dispatch' :: (a -> ExtensionMapping b) -> [a] -> [b]
+_dispatch' m = mapMaybe (mapItem Nothing (const Nothing) Just Nothing . m)
 
 _sel42 :: Functor f => f (a, b, c, d) -> f c
 _sel42 = fmap (\(_, _, c, _) -> c)
 
-mapToKnownExt :: Extension -> ExtensionMapping Extension KnownExtension
+mapToKnownExt :: Extension -> ExtensionMapping KnownExtension
 mapToKnownExt T.Cpp = Matches CPP
 mapToKnownExt T.OverlappingInstances = Matches OverlappingInstances
 mapToKnownExt T.UndecidableInstances = Matches UndecidableInstances
@@ -74,7 +74,7 @@ mapToKnownExt T.JavaScriptFFI = Matches JavaScriptFFI
 mapToKnownExt T.ParallelArrays = Matches ParallelArrays
 mapToKnownExt T.Arrows = Matches Arrows
 mapToKnownExt T.TemplateHaskell = Matches TemplateHaskell
-mapToKnownExt T.TemplateHaskellQuotes = ImpliedBy T.TemplateHaskellQuotes [TemplateHaskell]
+mapToKnownExt T.TemplateHaskellQuotes = ImpliedBy [TemplateHaskell]
 mapToKnownExt T.QuasiQuotes = Matches QuasiQuotes
 mapToKnownExt T.ImplicitParams = Matches ImplicitParams
 mapToKnownExt T.ImplicitPrelude = Matches ImplicitPrelude
@@ -95,7 +95,7 @@ mapToKnownExt T.RecordWildCards = Matches RecordWildCards
 mapToKnownExt T.RecordPuns = Matches RecordPuns
 mapToKnownExt T.ViewPatterns = Matches ViewPatterns
 mapToKnownExt T.GADTs = Matches GADTs
-mapToKnownExt T.GADTSyntax = ImpliedBy T.GADTSyntax [GADTs]
+mapToKnownExt T.GADTSyntax = ImpliedBy [GADTs]
 mapToKnownExt T.NPlusKPatterns = Matches NPlusKPatterns
 mapToKnownExt T.DoAndIfThenElse = Matches DoAndIfThenElse
 mapToKnownExt T.BlockArguments = Matches BlockArguments
@@ -217,7 +217,7 @@ knownExtsEnabledWithErrorsAndWarnings' = do
 knownExtsEnabledWithErrorsAndWarnings :: Q [KnownExtension]
 knownExtsEnabledWithErrorsAndWarnings = _sel42 knownExtsEnabledWithErrorsAndWarnings'
 
-mapToExt :: KnownExtension -> ExtensionMapping KnownExtension Extension
+mapToExt :: KnownExtension -> ExtensionMapping Extension
 mapToExt OverlappingInstances = Matches T.OverlappingInstances
 mapToExt UndecidableInstances = Matches T.UndecidableInstances
 mapToExt IncoherentInstances = Matches T.IncoherentInstances
@@ -228,7 +228,7 @@ mapToExt ParallelListComp = Matches T.ParallelListComp
 mapToExt MultiParamTypeClasses = Matches T.MultiParamTypeClasses
 mapToExt MonomorphismRestriction = Matches T.MonomorphismRestriction
 mapToExt FunctionalDependencies = Matches T.FunctionalDependencies
-mapToExt Rank2Types = ImpliedBy Rank2Types [T.RankNTypes]
+mapToExt Rank2Types = ImpliedBy [T.RankNTypes]
 mapToExt RankNTypes = Matches T.RankNTypes
 -- mapToExt PolymorphicComponents = Matches T.PolymorphicComponents
 mapToExt ExistentialQuantification = Matches T.ExistentialQuantification
